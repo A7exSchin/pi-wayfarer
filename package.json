@@ -2,10 +2,28 @@
   "name": "pi-wayfarer",
   "version": "0.1.0",
   "description": "Session navigator for the pi coding agent: content-derived titles, a toggleable left overlay to browse/switch sessions, per-session summaries, and staleness badges.",
-  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "sessions",
+    "tui"
+  ],
   "license": "MIT",
-  "keywords": ["pi", "pi-coding-agent", "pi-extension", "sessions", "tui"],
+  "type": "module",
+  "author": "Alexander Schindler",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/A7exSchin/pi-wayfarer.git"
+  },
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   }
 }

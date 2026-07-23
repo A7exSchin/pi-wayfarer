@@ -22,26 +22,42 @@ It improves pi's session management with:
 ## Install
 
 Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
-`pi-tui`, `pi-ai`), which the host provides — there are no dependencies to
-install.
+`pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
+nothing to install.
 
-Point pi at the extension in one of two ways:
-
-**A. Symlink into the auto-discovery directory** (enables `/reload`):
+### From git (recommended)
 
 ```bash
-ln -s ~/GitLib/pi-wayfarer/src ~/.pi/agent/extensions/wayfarer
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.1.0
 ```
 
-**B. Reference it from `~/.pi/agent/settings.json`:**
+Pin a released tag as above, or track `main` by omitting the ref. Use `-l` to
+install into project settings (`.pi/settings.json`) instead of your user
+settings. Update later with:
 
-```json
-{
-  "extensions": ["~/GitLib/pi-wayfarer/src/index.ts"]
-}
+```bash
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.0   # move to a new tag
+pi update --extensions                                   # reconcile the pinned ref
+pi remove  git:github.com/A7exSchin/pi-wayfarer          # uninstall
 ```
 
-Then start pi (or run `/reload` if symlinked).
+### Try it without installing
+
+```bash
+pi -e git:github.com/A7exSchin/pi-wayfarer
+```
+
+### From a local clone (development)
+
+Clone the repo, then from inside the working copy:
+
+```bash
+pi install .        # references this directory in settings (not copied)
+# or, without installing, for the current run only:
+pi -e .
+```
+
+After changes, run `/reload` inside pi to pick them up.
 
 ## Usage
 
@@ -101,10 +117,10 @@ by default. Adjust `toggleKey` if it clashes with your terminal.
 
 ## Type checking
 
-The `@earendil-works/*` packages resolve at runtime from the host pi install and
-are not vendored here. To type-check locally, map them via `tsconfig` `paths` to
-your installed pi (see the `paths` block used during development), or `npm link`
-the pi package.
+The `@earendil-works/*` packages are peer dependencies resolved at runtime from
+the host pi install and are not vendored here. To type-check locally, install a
+matching pi as a dev dependency (`npm install -D @earendil-works/pi-coding-agent`)
+or map the packages via `tsconfig` `paths`.
 
 ## License
 
