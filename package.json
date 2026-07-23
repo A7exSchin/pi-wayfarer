@@ -1,0 +1,11 @@
+{
+  "name": "pi-wayfarer",
+  "version": "0.1.0",
+  "description": "Session navigator for the pi coding agent: content-derived titles, a toggleable left overlay to browse/switch sessions, per-session summaries, and staleness badges.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi", "pi-coding-agent", "pi-extension", "sessions", "tui"],
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  }
+}
