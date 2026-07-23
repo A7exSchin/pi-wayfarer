@@ -2,9 +2,9 @@
  * Wayfarer configuration.
  *
  * Everything tunable lives here. Edit the values, then run `/reload` inside pi
- * (or restart) to apply. Keys use pi's keybinding string format
- * (see docs/keybindings.md): `ctrl`, `shift`, `alt` modifiers + a key, e.g.
- * "ctrl+shift+w". Single-character panel keys ("s", "t") are matched literally.
+ * (or restart) to apply. The in-panel keys (`summaryKey`, `scopeKey`) use pi's
+ * keybinding string format (see docs/keybindings.md); single-character keys such
+ * as "s" and "t" are matched literally.
  */
 
 import type { KeyId } from "@earendil-works/pi-tui";
@@ -12,12 +12,12 @@ import type { KeyId } from "@earendil-works/pi-tui";
 export type Scope = "folder" | "all";
 
 export interface WayfarerConfig {
-	/** Slash command that opens the panel. The toggle shortcut invokes this. */
+	/** Slash command that opens the panel. */
 	commandName: string;
+	/** Additional command names that behave identically (shorthands). */
+	aliasNames: string[];
 
-	// --- Shortcuts -----------------------------------------------------------
-	/** Global key that toggles the session overlay open. */
-	toggleKey: KeyId;
+	// --- In-panel keys -------------------------------------------------------
 	/** Inside the panel: summarize the highlighted session. */
 	summaryKey: KeyId;
 	/** Inside the panel: toggle between current-folder and all sessions. */
@@ -54,8 +54,8 @@ export interface WayfarerConfig {
 
 export const config: WayfarerConfig = {
 	commandName: "wayfarer",
+	aliasNames: ["wf"],
 
-	toggleKey: "ctrl+shift+w",
 	summaryKey: "s",
 	scopeKey: "t",
 

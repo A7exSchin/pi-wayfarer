@@ -8,16 +8,16 @@ It improves pi's session management with:
   recent conversation, instead of showing your first (sometimes throwaway)
   prompt. Titles are regenerated as the session grows and never overwrite a name
   you set yourself with `/name`.
-- **A toggleable session panel** — a left-anchored overlay listing sessions for
+- **A session panel** — a left-anchored overlay listing sessions for
   the current folder (or all folders), with **stale** badges derived from each
   session's last-modified time.
 - **Switch** to any session with `Enter`.
 - **Summarize** the highlighted session with `s` — a compact markdown recap
   generated on demand, without leaving the panel.
 
-> pi's TUI is single-column, so the panel is a **toggleable overlay** rendered
-> on top of the transcript — not a persistent side-by-side dock (the terminal
-> can't do a true split here).
+> pi's TUI is single-column, so the panel is an **overlay** rendered on top of
+> the transcript — not a persistent side-by-side dock (the terminal can't do a
+> true split here).
 
 ## Install
 
@@ -61,18 +61,22 @@ After changes, run `/reload` inside pi to pick them up.
 
 ## Usage
 
+Open the panel with the `/wayfarer` command (or its shorthand `/wf`):
+
 | Action | How |
 |--------|-----|
-| Open the panel | `/wayfarer`, or the toggle shortcut (`ctrl+shift+w`) |
+| Open the panel | `/wayfarer` or `/wf` |
 | Navigate | `↑` / `↓` |
 | Switch to selected session | `Enter` |
 | Summarize selected session | `s` |
 | Toggle folder ↔ all sessions | `t` |
-| Close | `Esc` (or the toggle key) |
+| Close | `Esc` |
 
-The toggle shortcut launches the `/wayfarer` command (pi resolves it as a
-command, so it adds no user turn). Switching sessions requires command context,
-which is why the real entry point is the command.
+The panel is a command rather than a keyboard shortcut on purpose: switching
+sessions requires command context, which pi grants only to command handlers —
+shortcut handlers cannot switch sessions, and `sendUserMessage` bypasses command
+handling. To open the panel with a keystroke, bind pi's built-in
+`app.session.resume` in `keybindings.json` for the native picker, or type `/wf`.
 
 Auto-titling happens in the background when pi finishes responding, throttled so
 it costs at most one small model call every few turns.
@@ -83,7 +87,8 @@ All knobs live in [`src/config.ts`](src/config.ts):
 
 | Setting | Default | Meaning |
 |---------|---------|---------|
-| `toggleKey` | `ctrl+shift+w` | Open the panel |
+| `commandName` | `wayfarer` | Primary command name |
+| `aliasNames` | `["wf"]` | Extra command names (shorthands) |
 | `summaryKey` | `s` | Summarize selected (in panel) |
 | `scopeKey` | `t` | Toggle folder ↔ all (in panel) |
 | `staleDays` | `7` | Older-than-this (by `modified`) → stale badge |
@@ -97,12 +102,6 @@ All knobs live in [`src/config.ts`](src/config.ts):
 | `summaryMaxChars` | `24000` | Session-text budget sent for summaries |
 
 After editing, run `/reload` in pi (or restart).
-
-### Keys
-
-Terminals cannot receive `Cmd`/`⌘`, so bindings use `ctrl` / `alt` / `shift`
-combinations. Many `ctrl` combos are already taken by pi; `ctrl+shift+w` is free
-by default. Adjust `toggleKey` if it clashes with your terminal.
 
 ## How it works (notes)
 

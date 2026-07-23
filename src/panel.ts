@@ -112,7 +112,7 @@ class SessionPanel {
 			if (s) this.onSummarize?.(s, this.selected);
 		} else if (keyHit(data, config.scopeKey)) {
 			this.onToggleScope?.();
-		} else if (matchesKey(data, Key.escape) || keyHit(data, config.toggleKey)) {
+		} else if (matchesKey(data, Key.escape)) {
 			this.onClose?.();
 		}
 	}
