@@ -39,6 +39,13 @@ function keyHit(data: string, key: KeyId): boolean {
 	return key.length === 1 ? data === key : matchesKey(data, key);
 }
 
+// SGR color/style escape sequences.
+const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
+
+function stripAnsi(text: string): string {
+	return text.replace(ANSI_PATTERN, "");
+}
+
 function relTime(date: Date): string {
 	const minutes = Math.floor((Date.now() - date.getTime()) / 60_000);
 	if (minutes < 1) return "now";
@@ -62,12 +69,18 @@ function displayName(session: SessionInfo): string {
 	return first && first.length > 0 ? first : "(untitled)";
 }
 
-const VIEWPORT = 14;
+const DEFAULT_TERM_HEIGHT = 24;
+// Border rules + header + help line + scroll counter that frame the list.
+const PANEL_CHROME_ROWS = 7;
+// Fraction of the terminal height the panel should occupy (matches maxHeight).
+const HEIGHT_FRACTION = 0.75;
+const MIN_VIEWPORT = 5;
 
 class SessionPanel {
 	selected: number;
 	private scope: Scope;
 	private loading = false;
+	private termHeight = DEFAULT_TERM_HEIGHT;
 
 	onSwitch?: (session: SessionInfo) => void;
 	onSummarize?: (session: SessionInfo, index: number) => void;
@@ -97,6 +110,16 @@ class SessionPanel {
 
 	setLoading(loading: boolean): void {
 		this.loading = loading;
+	}
+
+	/** Fed from the overlay's `visible` callback so the list can fill the height. */
+	setTermHeight(height: number): void {
+		if (height > 0) this.termHeight = height;
+	}
+
+	private viewportRows(): number {
+		const target = Math.floor(this.termHeight * HEIGHT_FRACTION) - PANEL_CHROME_ROWS;
+		return Math.max(MIN_VIEWPORT, target);
 	}
 
 	handleInput(data: string): void {
@@ -136,15 +159,16 @@ class SessionPanel {
 		} else if (this.sessions.length === 0) {
 			lines.push(truncateToWidth(t.fg("muted", "  no sessions found"), width));
 		} else {
+			const viewport = this.viewportRows();
 			const start = Math.min(
-				Math.max(0, this.selected - Math.floor(VIEWPORT / 2)),
-				Math.max(0, this.sessions.length - VIEWPORT),
+				Math.max(0, this.selected - Math.floor(viewport / 2)),
+				Math.max(0, this.sessions.length - viewport),
 			);
-			const end = Math.min(this.sessions.length, start + VIEWPORT);
+			const end = Math.min(this.sessions.length, start + viewport);
 			for (let i = start; i < end; i++) {
 				lines.push(this.renderRow(i, width));
 			}
-			if (this.sessions.length > VIEWPORT) {
+			if (this.sessions.length > viewport) {
 				lines.push(truncateToWidth(t.fg("dim", `  ${this.selected + 1}/${this.sessions.length}`), width));
 			}
 		}
@@ -171,7 +195,10 @@ class SessionPanel {
 		// Reserve space for the meta column, name fills the rest.
 		const metaWidth = visibleWidth(meta);
 		const nameBudget = Math.max(4, width - cursor.length - marker.length - metaWidth);
-		const name = truncateToWidth(displayName(session), nameBudget, "…");
+		// truncateToWidth embeds SGR resets around the ellipsis; strip them so the
+		// single fg() wrap below colors the whole row. Otherwise the reset ends the
+		// row color early and the trailing meta renders in the default (white).
+		const name = stripAnsi(truncateToWidth(displayName(session), nameBudget, "…"));
 
 		const rawName = `${cursor}${marker}${name}`;
 		const pad = Math.max(0, width - visibleWidth(rawName) - metaWidth);
@@ -201,9 +228,12 @@ export async function openPanel(ctx: ExtensionCommandContext, opts: OpenPanelOpt
 	const sessions = await loadSessions(ctx, scope);
 	const currentFile = ctx.sessionManager.getSessionFile();
 
+	let panelRef: SessionPanel | undefined;
+
 	return ctx.ui.custom<PanelResult>(
 		(tui, theme, _keybindings, done) => {
 			const panel = new SessionPanel(theme as unknown as PanelTheme, sessions, currentFile, opts.initialIndex, scope);
+			panelRef = panel;
 			panel.onSwitch = (session) => done({ type: "switch", session });
 			panel.onSummarize = (session, index) => done({ type: "summarize", session, index, scope });
 			panel.onClose = () => done({ type: "close" });
@@ -235,10 +265,14 @@ export async function openPanel(ctx: ExtensionCommandContext, opts: OpenPanelOpt
 		{
 			overlay: true,
 			overlayOptions: {
-				anchor: "left-center",
-				width: "38%",
+				anchor: "top-left",
+				width: "50%",
 				minWidth: 34,
-				maxHeight: "90%",
+				maxHeight: "75%",
+				visible: (_termWidth, termHeight) => {
+					panelRef?.setTermHeight(termHeight);
+					return true;
+				},
 			},
 		},
 	);
