@@ -9,6 +9,7 @@
 import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { type CompletionResponse, interpretCompletion } from "./llm-response.ts";
+import { withResolvedEndpoint } from "./llm-target.ts";
 
 // The pi-ai Model type is generic and heavy; we only pass it back to `complete`.
 type AnyModel = NonNullable<ExtensionContext["model"]>;
@@ -51,8 +52,14 @@ export async function runCompletion(
 	if (!auth.ok) throw new Error(auth.error);
 	if (!auth.apiKey) throw new Error(`No API key for ${model.provider}`);
 
+	// getApiKeyAndHeaders() carries no endpoint, and for providers whose endpoint
+	// is credential-derived the catalogue default is wrong — Copilot answers 421
+	// Misdirected Request when a business/enterprise token is presented at the
+	// individual endpoint.
+	const target = withResolvedEndpoint(model, await resolveBaseUrl(ctx, model.provider));
+
 	const response = await complete(
-		model,
+		target,
 		{
 			systemPrompt,
 			messages: [{ role: "user", content: [{ type: "text", text: userText }], timestamp: Date.now() }],
@@ -61,4 +68,18 @@ export async function runCompletion(
 	);
 
 	return interpretCompletion(response as unknown as CompletionResponse, `${model.provider}/${model.id}`);
+}
+
+/**
+ * The endpoint the current credential resolves to, or undefined when the
+ * provider has none. Never throws: a provider that cannot answer this leaves the
+ * catalogue endpoint in place.
+ */
+async function resolveBaseUrl(ctx: ExtensionContext, provider: string): Promise<string | undefined> {
+	try {
+		const resolved = await ctx.modelRegistry.getProviderAuth(provider);
+		return resolved?.auth?.baseUrl;
+	} catch {
+		return undefined;
+	}
 }
