@@ -16,6 +16,8 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { config, type Scope } from "./config.ts";
 import { openPanel } from "./panel.ts";
+import { parsePurgeArgs } from "./purge.ts";
+import { purgeOne, runPurge, runRestore } from "./purge-run.ts";
 import { parseRetitleArgs } from "./retitle.ts";
 import { runRetitle } from "./retitle-run.ts";
 import { showSummary } from "./summary.ts";
@@ -49,6 +51,26 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
+		// `/wf purge [flags]`
+		const purge = parsePurgeArgs(args, { days: config.purgeDays });
+		if (purge) {
+			if (!purge.ok) {
+				ctx.ui.notify(
+					`${purge.error}. Usage: /${config.commandName} purge [--days N] [--empty] [--global] [--force] [--dry-run] [--permanent]`,
+					"error",
+				);
+				return;
+			}
+			await runPurge(ctx, purge.args);
+			return;
+		}
+
+		// `/wf restore`
+		if (args.trim() === "restore") {
+			await runRestore(ctx);
+			return;
+		}
+
 		let index = 0;
 		let scope: Scope = config.defaultScope;
 
@@ -72,15 +94,19 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// result.type === "summarize": show it, then reopen the panel where we left off.
+			// result.type === "summarize" | "delete": act, then reopen where we left off.
 			index = result.index;
 			scope = result.scope;
-			await showSummary(ctx, result.session);
+			if (result.type === "delete") {
+				await purgeOne(ctx, result.session);
+			} else {
+				await showSummary(ctx, result.session);
+			}
 		}
 	};
 
 	pi.registerCommand(config.commandName, {
-		description: "Browse, switch, summarize sessions; `retitle [all]` to rename (Wayfarer)",
+		description: "Browse, switch, summarize sessions; retitle / purge / restore (Wayfarer)",
 		handler,
 	});
 

@@ -23,12 +23,30 @@ export interface WayfarerConfig {
 	summaryKey: KeyId;
 	/** Inside the panel: toggle between current-folder and all sessions. */
 	scopeKey: KeyId;
+	/** Inside the panel: move the highlighted session to the Wayfarer bin. */
+	deleteKey: KeyId;
 
 	// --- Panel ---------------------------------------------------------------
 	/** Sessions whose `modified` is older than this many days get a stale badge. */
 	staleDays: number;
 	/** Initial listing scope when the panel opens. */
 	defaultScope: Scope;
+
+	// --- Purge ---------------------------------------------------------------
+	/**
+	 * `/wf purge` removes sessions older than this many days. Deliberately
+	 * separate from `staleDays`: that one only drives a badge in the panel, and a
+	 * visual hint makes a poor threshold for destroying data.
+	 */
+	purgeDays: number;
+	/**
+	 * How long the Wayfarer bin (`.wayfarer-trash/` inside the session directory)
+	 * keeps a session before it is really deleted. Expired entries are pruned at
+	 * the start of each purge run, through the `trash` CLI when available.
+	 */
+	purgeRetentionDays: number;
+	/** `/wf purge --empty` treats sessions with at most this many messages as empty. */
+	purgeMaxMessages: number;
 
 	// --- Auto titles ---------------------------------------------------------
 	/**
@@ -84,9 +102,14 @@ export const config: WayfarerConfig = {
 
 	summaryKey: "s",
 	scopeKey: "t",
+	deleteKey: "d",
 
 	staleDays: 7,
 	defaultScope: "folder",
+
+	purgeDays: 90,
+	purgeRetentionDays: 30,
+	purgeMaxMessages: 2,
 
 	titleStrategy: "heuristic",
 	language: DEFAULT_LANGUAGE_ID,

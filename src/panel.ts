@@ -17,6 +17,7 @@ import { listSessions } from "./sessions.ts";
 export type PanelResult =
 	| { type: "switch"; session: SessionInfo }
 	| { type: "summarize"; session: SessionInfo; index: number; scope: Scope }
+	| { type: "delete"; session: SessionInfo; index: number; scope: Scope }
 	| { type: "close" };
 
 interface OpenPanelOptions {
@@ -83,6 +84,7 @@ class SessionPanel {
 
 	onSwitch?: (session: SessionInfo) => void;
 	onSummarize?: (session: SessionInfo, index: number) => void;
+	onDelete?: (session: SessionInfo, index: number) => void;
 	onToggleScope?: () => void;
 	onClose?: () => void;
 
@@ -132,6 +134,9 @@ class SessionPanel {
 		} else if (keyHit(data, config.summaryKey)) {
 			const s = this.sessions[this.selected];
 			if (s) this.onSummarize?.(s, this.selected);
+		} else if (keyHit(data, config.deleteKey)) {
+			const s = this.sessions[this.selected];
+			if (s) this.onDelete?.(s, this.selected);
 		} else if (keyHit(data, config.scopeKey)) {
 			this.onToggleScope?.();
 		} else if (matchesKey(data, Key.escape)) {
@@ -174,7 +179,7 @@ class SessionPanel {
 
 		lines.push(this.rule(width));
 		const scopeHint = this.scope === "folder" ? "all" : "folder";
-		const help = `↑↓ move · ⏎ switch · ${config.summaryKey} summary · ${config.scopeKey} ${scopeHint} · esc close`;
+		const help = `↑↓ move · ⏎ switch · ${config.summaryKey} summary · ${config.deleteKey} bin · ${config.scopeKey} ${scopeHint} · esc close`;
 		lines.push(truncateToWidth(t.fg("dim", help), width));
 		lines.push(this.rule(width));
 		return lines;
@@ -235,6 +240,7 @@ export async function openPanel(ctx: ExtensionCommandContext, opts: OpenPanelOpt
 			panelRef = panel;
 			panel.onSwitch = (session) => done({ type: "switch", session });
 			panel.onSummarize = (session, index) => done({ type: "summarize", session, index, scope });
+			panel.onDelete = (session, index) => done({ type: "delete", session, index, scope });
 			panel.onClose = () => done({ type: "close" });
 			panel.onToggleScope = () => {
 				scope = scope === "folder" ? "all" : "folder";
