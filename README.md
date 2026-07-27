@@ -28,13 +28,13 @@ Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
 `pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
 nothing to install.
 
-The latest release is **v0.5.2**. Releases are git tags; there is no npm
+The latest release is **v0.6.0**. Releases are git tags; there is no npm
 package.
 
 ### Install a specific version (recommended)
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.2
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.6.0
 ```
 
 The ref is **pinned**. `pi update --extensions` re-fetches that exact tag and
@@ -45,7 +45,7 @@ To change version later — upgrade *or* downgrade — re-run install with the n
 tag:
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.1   # move to another tag
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.2   # move to another tag
 ```
 
 ### Always install the latest (track `main`)
@@ -68,7 +68,7 @@ tolerate breakage; use a tag otherwise.
 | `pi update --extensions` | re-resets the clone to the **same** tag | fast-forwards to the newest `main` commit |
 | `pi update git:github.com/A7exSchin/pi-wayfarer` | same, for this package only | same, for this package only |
 | `pi update --all` | as above, **and** updates the pi CLI itself | as above, and updates pi |
-| `pi install …@v0.5.2` | moves the pin to that tag | replaces tracking with a pin |
+| `pi install …@v0.6.0` | moves the pin to that tag | replaces tracking with a pin |
 
 ```bash
 pi list                                          # show installed packages
@@ -84,7 +84,7 @@ trusted.
 
 ```bash
 pi -e git:github.com/A7exSchin/pi-wayfarer          # latest main, this run only
-pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.2   # a specific tag, this run only
+pi -e git:github.com/A7exSchin/pi-wayfarer@v0.6.0   # a specific tag, this run only
 ```
 
 Installs to a temporary directory and is discarded when pi exits.
@@ -115,6 +115,7 @@ After changes, run `/reload` inside pi to pick them up.
 
 | Tag | Contents |
 |---|---|
+| `v0.6.0` | `,` opens a settings overlay; summary/title model and strategy persist to `wayfarer.json` |
 | `v0.5.2` | `c` copies an overlay; requests use the credential-resolved endpoint (fixes Copilot 421) |
 | `v0.5.1` | Provider errors are reported instead of being shown as empty results |
 | `v0.5.0` | `/wf purge` + `/wf restore`, recoverable bin, `d` key in the panel |
@@ -141,12 +142,32 @@ Open the panel with the `/wayfarer` command (or its shorthand `/wf`):
 | Summarize selected session | `s` |
 | Copy summary / plan to clipboard | `c` (in the overlay) |
 | Move selected session to the bin | `d` |
+| Open settings | `,` |
 | Toggle folder ↔ all sessions | `t` |
 | Close | `Esc` |
 | Retitle the current session | `/wf retitle` |
 | Retitle stored sessions | `/wf retitle all` |
 | Purge stale sessions | `/wf purge` |
 | Restore a purged session | `/wf restore` |
+| Open settings | `,` in the panel |
+
+### Settings
+
+Press `,` in the panel to open the settings overlay. Changes are written to
+`~/.pi/agent/wayfarer.json` (honouring `PI_CODING_AGENT_DIR`) and applied to the
+running session immediately — no `/reload` needed, and they survive one.
+
+| Setting | Values |
+|---|---|
+| Summary model | the session's current model, or any available `provider/model-id` |
+| Title model | same; used by the `llm` and `auto` strategies |
+| Title strategy | `heuristic` · `llm` · `auto` |
+| Default scope | `folder` · `all` |
+
+The two model rows open a searchable picker — cycling through dozens of models
+with arrow keys would be unusable. Everything else here stays editable in
+`config.ts`; the JSON is a validated overlay over those defaults, and unknown
+keys or bad values are reported once and ignored rather than reverting silently.
 
 ### Purging stale sessions
 
@@ -259,6 +280,7 @@ All knobs live in [`src/config.ts`](src/config.ts):
 | `summaryKey` | `s` | Summarize selected (in panel) |
 | `scopeKey` | `t` | Toggle folder ↔ all (in panel) |
 | `deleteKey` | `d` | Move selected session to the bin (in panel) |
+| `settingsKey` | `,` | Open the settings overlay (in panel) |
 | `copyKey` | `c` | Copy the overlay's contents to the clipboard |
 | `staleDays` | `7` | Older-than-this (by `modified`) → stale badge |
 | `defaultScope` | `folder` | `folder` = current dir, `all` = every project |
