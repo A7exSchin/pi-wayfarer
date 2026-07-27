@@ -14,6 +14,9 @@ It improves pi's session management with:
 - **Switch** to any session with `Enter`.
 - **Summarize** the highlighted session with `s` — a compact markdown recap
   generated on demand, without leaving the panel.
+- **Purge** stale sessions — in bulk with `/wf purge`, or one at a time with `d`
+  in the panel. Purged sessions go to a recoverable bin, not straight to
+  deletion.
 
 > pi's TUI is single-column, so the panel is an **overlay** rendered on top of
 > the transcript — not a persistent side-by-side dock (the terminal can't do a
@@ -25,13 +28,13 @@ Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
 `pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
 nothing to install.
 
-The latest release is **v0.2.1**. Releases are git tags; there is no npm
+The latest release is **v0.5.0**. Releases are git tags; there is no npm
 package.
 
 ### Install a specific version (recommended)
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.1
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.0
 ```
 
 The ref is **pinned**. `pi update --extensions` re-fetches that exact tag and
@@ -42,7 +45,7 @@ To change version later — upgrade *or* downgrade — re-run install with the n
 tag:
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.0   # move to another tag
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.4.0   # move to another tag
 ```
 
 ### Always install the latest (track `main`)
@@ -65,7 +68,7 @@ tolerate breakage; use a tag otherwise.
 | `pi update --extensions` | re-resets the clone to the **same** tag | fast-forwards to the newest `main` commit |
 | `pi update git:github.com/A7exSchin/pi-wayfarer` | same, for this package only | same, for this package only |
 | `pi update --all` | as above, **and** updates the pi CLI itself | as above, and updates pi |
-| `pi install …@v0.3.0` | moves the pin to that tag | replaces tracking with a pin |
+| `pi install …@v0.5.0` | moves the pin to that tag | replaces tracking with a pin |
 
 ```bash
 pi list                                          # show installed packages
@@ -81,7 +84,7 @@ trusted.
 
 ```bash
 pi -e git:github.com/A7exSchin/pi-wayfarer          # latest main, this run only
-pi -e git:github.com/A7exSchin/pi-wayfarer@v0.2.1   # a specific tag, this run only
+pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.0   # a specific tag, this run only
 ```
 
 Installs to a temporary directory and is discarded when pi exits.
@@ -102,6 +105,9 @@ After changes, run `/reload` inside pi to pick them up.
 
 | Tag | Contents |
 |---|---|
+| `v0.5.0` | `/wf purge` + `/wf restore`, recoverable bin, `d` key in the panel |
+| `v0.4.0` | `/wf retitle` and `/wf retitle all`; session-directory fix |
+| `v0.3.0` | Deterministic titles with confidence scoring, language packs |
 | `v0.2.1` | Panel stale-row colour fix, larger overlay |
 | `v0.2.0` | Command-only panel with the `/wf` alias |
 | `v0.1.1` | Declared `@earendil-works/*` peer dependencies |
@@ -121,12 +127,55 @@ Open the panel with the `/wayfarer` command (or its shorthand `/wf`):
 | Navigate | `↑` / `↓` |
 | Switch to selected session | `Enter` |
 | Summarize selected session | `s` |
+| Move selected session to the bin | `d` |
 | Toggle folder ↔ all sessions | `t` |
 | Close | `Esc` |
 | Retitle the current session | `/wf retitle` |
 | Retitle stored sessions | `/wf retitle all` |
+| Purge stale sessions | `/wf purge` |
+| Restore a purged session | `/wf restore` |
 
-### Retitling existing sessions
+### Purging stale sessions
+
+```bash
+/wf purge                   # sessions in this folder older than `purgeDays`
+/wf purge --days 30         # override the age threshold
+/wf purge --empty           # near-empty sessions, any age
+/wf purge --global          # every project                        (-g)
+/wf purge --dry-run         # show the plan, delete nothing        (-n)
+/wf purge --force           # include sessions you named by hand   (-f)
+/wf purge --permanent       # bypass the bin and delete outright
+/wf restore                 # put a binned session back
+```
+
+The plan — what would go, how old, how many messages, how much disk — is always
+shown before anything moves, and applying it asks for confirmation.
+
+**Nothing is destroyed on the day you purge.** Sessions are *moved* into
+`<session-dir>/.wayfarer-trash/`, which pi never lists (`SessionManager.list`
+reads `*.jsonl` non-recursively, so a nested directory is invisible). A move
+within one directory is an atomic rename — no copy, no half-written file. Entries
+older than `purgeRetentionDays` are deleted for real at the start of the next
+purge run, via the `trash` CLI when available, exactly as pi's own `/resume`
+deletion does.
+
+What a purge deliberately keeps:
+
+| Kept | Why |
+|---|---|
+| The session pi has open | Deleting the file you are writing to |
+| Sessions modified in the last 5 minutes | They may belong to another running pi |
+| Sessions you named by hand | A name is intent (`--force` opts in) |
+| Sessions another session forked from | Deleting a parent orphans its forks |
+
+A name written by Wayfarer's own titler does **not** protect a session — it is
+recognised by the `wayfarer-title` marker entry and treated as auto-generated.
+Without that, running `/wf retitle all` would make every session permanently
+unpurgeable.
+
+`purgeDays` is separate from `staleDays` on purpose: the latter only drives the
+panel's badge, and a visual hint makes a poor threshold for destroying data.
+
 
 Titles are normally generated as you work, which leaves sessions from before you
 installed Wayfarer unnamed. `retitle` fixes that after the fact:
@@ -196,8 +245,12 @@ All knobs live in [`src/config.ts`](src/config.ts):
 | `aliasNames` | `["wf"]` | Extra command names (shorthands) |
 | `summaryKey` | `s` | Summarize selected (in panel) |
 | `scopeKey` | `t` | Toggle folder ↔ all (in panel) |
+| `deleteKey` | `d` | Move selected session to the bin (in panel) |
 | `staleDays` | `7` | Older-than-this (by `modified`) → stale badge |
 | `defaultScope` | `folder` | `folder` = current dir, `all` = every project |
+| `purgeDays` | `90` | `/wf purge` age threshold (not the badge threshold) |
+| `purgeRetentionDays` | `30` | How long the bin keeps a session before real deletion |
+| `purgeMaxMessages` | `2` | What `--empty` counts as near-empty |
 | `titleStrategy` | `heuristic` | `heuristic` (free) · `llm` · `auto` (heuristic, LLM fallback) |
 | `language` | `"en"` | Language pack id, or a `LanguagePack` object (see below) |
 | `titleConfidenceThreshold` | `2` | Score at which `auto` trusts the heuristic and skips the model |
@@ -248,6 +301,10 @@ After editing, run `/reload` in pi (or restart).
   the session directory comes from the running context, so a custom
   `--session-dir` is respected. Staleness is derived from `SessionInfo.modified`.
   Selection returns to the command handler, which owns `switchSession`.
+- Purge: sessions are renamed into `<session-dir>/.wayfarer-trash/` with an
+  append-only `manifest.jsonl` recording origin, name and timestamp, so
+  `/wf restore` can put them back exactly. Real deletion happens only when an
+  entry outlives `purgeRetentionDays`.
 - Summary: uses `SessionInfo.allMessagesText` (already collected for the
   picker), so it never re-opens the session file.
 
@@ -302,7 +359,7 @@ node test/evaluate-sessions.ts --language de
 ## Tests
 
 ```bash
-npm test          # unit tests for the deterministic titler (Node's runner, no deps)
+npm test          # unit tests (titler, language packs, retitle, purge, bin)
 npm run eval      # replay your own sessions through the titler, read-only
 ```
 
