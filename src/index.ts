@@ -16,6 +16,8 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { config, type Scope } from "./config.ts";
 import { openPanel } from "./panel.ts";
+import { parseRetitleArgs } from "./retitle.ts";
+import { runRetitle } from "./retitle-run.ts";
 import { showSummary } from "./summary.ts";
 import { maybeGenerateTitle, restoreTitleState } from "./titles.ts";
 
@@ -30,9 +32,20 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// --- Panel command -------------------------------------------------------
-	const handler = async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {
+	const handler = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
 		if (ctx.mode !== "tui") {
 			ctx.ui.notify("Wayfarer requires interactive mode", "error");
+			return;
+		}
+
+		// `/wf retitle [all] [flags]` — anything else opens the panel.
+		const parsed = parseRetitleArgs(args);
+		if (parsed) {
+			if (!parsed.ok) {
+				ctx.ui.notify(`${parsed.error}. Usage: /${config.commandName} retitle [all] [--global] [--force] [--dry-run] [--llm]`, "error");
+				return;
+			}
+			await runRetitle(pi, ctx, parsed.args);
 			return;
 		}
 
@@ -67,7 +80,7 @@ export default function (pi: ExtensionAPI) {
 	};
 
 	pi.registerCommand(config.commandName, {
-		description: "Browse, switch, and summarize sessions (Wayfarer)",
+		description: "Browse, switch, summarize sessions; `retitle [all]` to rename (Wayfarer)",
 		handler,
 	});
 

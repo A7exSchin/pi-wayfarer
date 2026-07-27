@@ -17,7 +17,7 @@ import { type CompiledLanguage, resolveLanguage } from "./lang/index.ts";
 import { resolveModel, runCompletion } from "./llm.ts";
 import { heuristicTitle } from "./title-heuristic.ts";
 
-const TITLE_MARKER = "wayfarer-title";
+export const TITLE_MARKER = "wayfarer-title";
 
 const SYSTEM_PROMPT = `You generate a short title for a coding assistant session.
 
@@ -40,7 +40,7 @@ interface TitleState {
 	inFlight: boolean;
 }
 
-interface TitleMarkerData {
+export interface TitleMarkerData {
 	name: string;
 	at: number;
 }
@@ -61,7 +61,7 @@ function getState(ctx: ExtensionContext): TitleState {
 	return state;
 }
 
-function assistantTurnCount(entries: SessionEntry[]): number {
+export function assistantTurnCount(entries: SessionEntry[]): number {
 	let count = 0;
 	for (const entry of entries) {
 		if (entry.type === "message" && entry.message.role === "assistant") count++;
@@ -143,8 +143,47 @@ export async function maybeGenerateTitle(pi: ExtensionAPI, ctx: ExtensionContext
 	}
 }
 
-/** Produce a title according to the configured strategy. */
-async function generateTitle(ctx: ExtensionContext, entries: SessionEntry[]): Promise<string | null> {
+/**
+ * Retitle the current session on demand, ignoring the turn-count throttle.
+ * Honours a human-set name unless `force` is set.
+ */
+export async function retitleCurrent(
+	pi: ExtensionAPI,
+	ctx: ExtensionContext,
+	force: boolean,
+): Promise<{ ok: true; title: string } | { ok: false; reason: string }> {
+	const state = getState(ctx);
+	if (state.inFlight) return { ok: false, reason: "a title is already being generated" };
+
+	const currentName = pi.getSessionName();
+	if (currentName && currentName !== state.autoName && !force) {
+		state.userOverride = true;
+		return { ok: false, reason: `"${currentName}" was set by hand — use --force to replace it` };
+	}
+
+	const entries = ctx.sessionManager.getBranch();
+	state.inFlight = true;
+	try {
+		const raw = await generateTitle(ctx, entries);
+		const title = raw ? cleanTitle(raw) : "";
+		if (!title) return { ok: false, reason: "not enough content to derive a title" };
+
+		const turns = assistantTurnCount(entries);
+		pi.setSessionName(title);
+		pi.appendEntry<TitleMarkerData>(TITLE_MARKER, { name: title, at: turns });
+		state.autoName = title;
+		state.lastTitledAt = turns;
+		state.userOverride = false;
+		return { ok: true, title };
+	} catch (error) {
+		return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+	} finally {
+		state.inFlight = false;
+	}
+}
+
+/** Produce a title according to the configured strategy. Exported for batch retitling. */
+export async function generateTitle(ctx: ExtensionContext, entries: SessionEntry[]): Promise<string | null> {
 	switch (config.titleStrategy) {
 		case "heuristic":
 			return heuristic(entries).title || null;
@@ -159,7 +198,7 @@ async function generateTitle(ctx: ExtensionContext, entries: SessionEntry[]): Pr
 }
 
 /** Run the deterministic titler with the configured caps, threshold and language. */
-function heuristic(entries: SessionEntry[]) {
+export function heuristic(entries: SessionEntry[]) {
 	return heuristicTitle(entries, {
 		maxLen: config.maxTitleLength,
 		confidenceThreshold: config.titleConfidenceThreshold,
@@ -214,7 +253,7 @@ async function llmTitle(ctx: ExtensionContext, entries: SessionEntry[]): Promise
 	}
 }
 
-function cleanTitle(raw: string): string {
+export function cleanTitle(raw: string): string {
 	let title = raw.split("\n")[0]?.trim() ?? "";
 	// Strip wrapping quotes/backticks a model might add despite instructions.
 	title = title.replace(/^["'`]+|["'`]+$/g, "").trim();
