@@ -8,6 +8,7 @@
 
 import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type CompletionResponse, interpretCompletion } from "./llm-response.ts";
 
 // The pi-ai Model type is generic and heavy; we only pass it back to `complete`.
 type AnyModel = NonNullable<ExtensionContext["model"]>;
@@ -32,8 +33,12 @@ export function resolveModel(ctx: ExtensionContext, override: string | undefined
 }
 
 /**
- * Run a single-shot completion. Returns the text, or null if aborted/empty.
- * Throws on auth failure so callers can surface a clear error.
+ * Run a single-shot completion. Returns the text, or null when the call was
+ * aborted or the model produced nothing.
+ *
+ * Throws on auth failure *and* on a failed call: `complete()` resolves rather
+ * than rejecting when the provider errors, so without this the caller cannot
+ * tell a broken request from an empty answer.
  */
 export async function runCompletion(
 	ctx: ExtensionContext,
@@ -55,13 +60,5 @@ export async function runCompletion(
 		{ apiKey: auth.apiKey, headers: auth.headers, env: auth.env, signal },
 	);
 
-	if (response.stopReason === "aborted") return null;
-
-	const text = response.content
-		.filter((c): c is { type: "text"; text: string } => c.type === "text")
-		.map((c) => c.text)
-		.join("\n")
-		.trim();
-
-	return text.length > 0 ? text : null;
+	return interpretCompletion(response as unknown as CompletionResponse, `${model.provider}/${model.id}`);
 }
