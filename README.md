@@ -8,7 +8,7 @@ It improves pi's session management with:
   recent conversation, instead of showing your first (sometimes throwaway)
   prompt. Titles are regenerated as the session grows and never overwrite a name
   you set yourself with `/name`.
-- **A session panel** — a left-anchored overlay listing sessions for
+- **A session panel** — a centred overlay listing sessions for
   the current folder (or all folders), with **stale** badges derived from each
   session's last-modified time.
 - **Switch** to any session with `Enter`.
@@ -115,7 +115,7 @@ After changes, run `/reload` inside pi to pick them up.
 
 | Tag | Contents |
 |---|---|
-| `v0.6.0` | `,` opens a settings overlay; summary/title model and strategy persist to `wayfarer.json` |
+| `v0.6.0` | `,` opens a settings overlay; summary/title model and strategy persist to `wayfarer.json`; panel is centred and keeps a minimum height |
 | `v0.5.2` | `c` copies an overlay; requests use the credential-resolved endpoint (fixes Copilot 421) |
 | `v0.5.1` | Provider errors are reported instead of being shown as empty results |
 | `v0.5.0` | `/wf purge` + `/wf restore`, recoverable bin, `d` key in the panel |

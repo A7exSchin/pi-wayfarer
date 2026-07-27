@@ -72,6 +72,7 @@ const DEFAULT_TERM_HEIGHT = 24;
 const PANEL_CHROME_ROWS = 7;
 // Fraction of the terminal height the panel should occupy (matches maxHeight).
 const HEIGHT_FRACTION = 0.75;
+/** How many list rows the panel shows at minimum, so a short session list keeps its size. */
 const MIN_VIEWPORT = 5;
 
 class SessionPanel {
@@ -165,15 +166,22 @@ class SessionPanel {
 			lines.push(truncateToWidth(t.fg("muted", "  no sessions found"), width));
 		} else {
 			const viewport = this.viewportRows();
+			// Show at most `viewport` rows, but at least `MIN_VIEWPORT` — the latter by
+			// padding blanks — so a short list keeps a usable size without filling
+			// the whole terminal.
+			const desired = Math.max(MIN_VIEWPORT, Math.min(this.sessions.length, viewport));
 			const start = Math.min(
-				Math.max(0, this.selected - Math.floor(viewport / 2)),
-				Math.max(0, this.sessions.length - viewport),
+				Math.max(0, this.selected - Math.floor(desired / 2)),
+				Math.max(0, this.sessions.length - desired),
 			);
-			const end = Math.min(this.sessions.length, start + viewport);
+			const end = Math.min(this.sessions.length, start + desired);
 			for (let i = start; i < end; i++) {
 				lines.push(this.renderRow(i, width));
 			}
-			if (this.sessions.length > viewport) {
+			for (let i = end; i < start + desired; i++) {
+				lines.push(" ".repeat(width));
+			}
+			if (this.sessions.length > desired) {
 				lines.push(truncateToWidth(t.fg("dim", `  ${this.selected + 1}/${this.sessions.length}`), width));
 			}
 		}
@@ -272,7 +280,7 @@ export async function openPanel(ctx: ExtensionCommandContext, opts: OpenPanelOpt
 		{
 			overlay: true,
 			overlayOptions: {
-				anchor: "top-left",
+				anchor: "center",
 				width: "50%",
 				minWidth: 34,
 				maxHeight: "75%",

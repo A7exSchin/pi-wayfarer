@@ -11,9 +11,15 @@
 
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { getSelectListTheme, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
-import { type SelectItem, SelectList, type SettingItem, SettingsList } from "@earendil-works/pi-tui";
+import { type SelectItem, SelectList, type SettingItem, SettingsList, truncateToWidth } from "@earendil-works/pi-tui";
 import { config } from "./config.ts";
 import { applySettings, saveSettings, settingsFromConfig, type WayfarerSettings } from "./settings.ts";
+
+/** Theme surface we rely on, matching the markdown overlay. */
+interface ViewTheme {
+	fg(color: string, text: string): string;
+	bold(text: string): string;
+}
 
 /** Shown for a model setting that follows the session's current model. */
 const SESSION_MODEL = "(session model)";
@@ -89,7 +95,8 @@ export async function showSettings(ctx: ExtensionCommandContext): Promise<void> 
 	];
 
 	await ctx.ui.custom<void>(
-		(tui, _theme, _keybindings, done) => {
+		(tui, theme, _keybindings, done) => {
+			const viewTheme = theme as unknown as ViewTheme;
 			const list = new SettingsList(
 				items,
 				MAX_VISIBLE,
@@ -125,11 +132,16 @@ export async function showSettings(ctx: ExtensionCommandContext): Promise<void> 
 					tui.requestRender();
 				},
 				() => done(),
-				{ enableSearch: true },
-			);
+		);
 
 			return {
-				render: (width) => list.render(width),
+				// Frame the list like every other overlay: rule + title + rule, then the
+				// SettingsList body (which ends in its own hint line), then a closing rule.
+				render: (width) => {
+					const rule = viewTheme.fg("border", "─".repeat(width));
+					const title = truncateToWidth(viewTheme.fg("accent", viewTheme.bold("Wayfarer · settings")), width);
+					return [rule, title, rule, ...list.render(width), rule];
+				},
 				handleInput: (data) => {
 					list.handleInput(data);
 					tui.requestRender();
