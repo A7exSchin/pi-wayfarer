@@ -1,6 +1,6 @@
 {
   "name": "pi-wayfarer",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Session navigator for the pi coding agent: content-derived titles, a toggleable left overlay to browse/switch sessions, per-session summaries, and staleness badges.",
   "keywords": [
     "pi-package",
