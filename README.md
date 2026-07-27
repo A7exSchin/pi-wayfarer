@@ -123,6 +123,56 @@ Open the panel with the `/wayfarer` command (or its shorthand `/wf`):
 | Summarize selected session | `s` |
 | Toggle folder ↔ all sessions | `t` |
 | Close | `Esc` |
+| Retitle the current session | `/wf retitle` |
+| Retitle stored sessions | `/wf retitle all` |
+
+### Retitling existing sessions
+
+Titles are normally generated as you work, which leaves sessions from before you
+installed Wayfarer unnamed. `retitle` fixes that after the fact:
+
+```bash
+/wf retitle                 # name the current session now, ignoring the throttle
+/wf retitle --dry-run       # show what it would be named, write nothing
+/wf retitle all             # unnamed sessions in this folder
+/wf retitle all --global    # unnamed sessions in every project
+/wf retitle all --dry-run   # show the plan, write nothing
+/wf retitle all --force     # also replace names you set by hand
+/wf retitle all --llm       # use titleStrategy instead of the free heuristic
+```
+
+Short forms: `-g`, `-n`, `-f`. The plan is always shown before anything is
+written, and a batch run asks for confirmation.
+
+What a batch run deliberately leaves alone:
+
+| Skipped | Why |
+|---|---|
+| The session pi has open | Two `SessionManager` instances on one file would diverge |
+| Sessions modified in the last 5 minutes | They may belong to another running pi |
+| Sessions that already have a name | Your names are not ours to overwrite (`--force` opts in) |
+| Sessions with no derivable title | Better unnamed than named "Model" |
+
+Batch runs use the **free heuristic** regardless of `titleStrategy`: `auto` over
+a few hundred sessions would be a few hundred model calls from one keystroke.
+`--llm` opts in explicitly.
+
+Writes go through pi's public `SessionManager.open()` / `appendSessionInfo()`
+API — no `.jsonl` files are edited by hand. Listing and writing both honour
+`pi --session-dir <dir>` and `PI_CODING_AGENT_SESSION_DIR`, so pointing pi at a
+copy of your sessions is a safe way to try this out:
+
+```bash
+cp -a ~/.pi/agent/sessions/--Users-you-project-- /tmp/wf-trial
+cd ~/project && pi -e /path/to/pi-wayfarer --session-dir /tmp/wf-trial
+```
+
+Two caveats worth knowing: renaming cannot be undone (the old name stays in the
+session history, but nothing surfaces it), and opening a pre-v3 session migrates
+it, so a batch run may rewrite old session files as a side effect.
+
+To see what would happen without starting pi at all, use the evaluator:
+`npm run eval` prints the proposed title, score and reasons for every session.
 
 The panel is a command rather than a keyboard shortcut on purpose: switching
 sessions requires command context, which pi grants only to command handlers —
@@ -194,9 +244,10 @@ After editing, run `/reload` in pi (or restart).
     bars are high because ranking already maximises recurrence.
   - A `custom` session entry records our last auto-title so a human-set `/name`
     is detected and never clobbered, surviving reloads.
-- Panel: `SessionManager.list(cwd)` / `listAll()` for the two scopes; staleness
-  is derived from `SessionInfo.modified`. Selection returns to the command
-  handler, which owns `switchSession`.
+- Panel: `SessionManager.list(cwd, sessionDir)` / `listAll()` for the two scopes;
+  the session directory comes from the running context, so a custom
+  `--session-dir` is respected. Staleness is derived from `SessionInfo.modified`.
+  Selection returns to the command handler, which owns `switchSession`.
 - Summary: uses `SessionInfo.allMessagesText` (already collected for the
   picker), so it never re-opens the session file.
 
