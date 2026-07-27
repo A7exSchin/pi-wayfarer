@@ -28,13 +28,13 @@ Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
 `pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
 nothing to install.
 
-The latest release is **v0.5.1**. Releases are git tags; there is no npm
+The latest release is **v0.5.2**. Releases are git tags; there is no npm
 package.
 
 ### Install a specific version (recommended)
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.1
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.2
 ```
 
 The ref is **pinned**. `pi update --extensions` re-fetches that exact tag and
@@ -45,7 +45,7 @@ To change version later — upgrade *or* downgrade — re-run install with the n
 tag:
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.4.0   # move to another tag
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.1   # move to another tag
 ```
 
 ### Always install the latest (track `main`)
@@ -68,7 +68,7 @@ tolerate breakage; use a tag otherwise.
 | `pi update --extensions` | re-resets the clone to the **same** tag | fast-forwards to the newest `main` commit |
 | `pi update git:github.com/A7exSchin/pi-wayfarer` | same, for this package only | same, for this package only |
 | `pi update --all` | as above, **and** updates the pi CLI itself | as above, and updates pi |
-| `pi install …@v0.5.0` | moves the pin to that tag | replaces tracking with a pin |
+| `pi install …@v0.5.2` | moves the pin to that tag | replaces tracking with a pin |
 
 ```bash
 pi list                                          # show installed packages
@@ -84,7 +84,7 @@ trusted.
 
 ```bash
 pi -e git:github.com/A7exSchin/pi-wayfarer          # latest main, this run only
-pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.1   # a specific tag, this run only
+pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.2   # a specific tag, this run only
 ```
 
 Installs to a temporary directory and is discarded when pi exits.
@@ -115,6 +115,7 @@ After changes, run `/reload` inside pi to pick them up.
 
 | Tag | Contents |
 |---|---|
+| `v0.5.2` | `c` copies an overlay; requests use the credential-resolved endpoint (fixes Copilot 421) |
 | `v0.5.1` | Provider errors are reported instead of being shown as empty results |
 | `v0.5.0` | `/wf purge` + `/wf restore`, recoverable bin, `d` key in the panel |
 | `v0.4.0` | `/wf retitle` and `/wf retitle all`; session-directory fix |
