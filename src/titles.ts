@@ -13,7 +13,9 @@
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
 import { config } from "./config.ts";
+import { type CompiledLanguage, resolveLanguage } from "./lang/index.ts";
 import { resolveModel, runCompletion } from "./llm.ts";
+import { heuristicTitle } from "./title-heuristic.ts";
 
 const TITLE_MARKER = "wayfarer-title";
 
@@ -83,6 +85,7 @@ function recentConversationText(entries: SessionEntry[], lastN: number): string 
 export function restoreTitleState(pi: ExtensionAPI, ctx: ExtensionContext): void {
 	const state = getState(ctx);
 	state.inFlight = false;
+	reportLanguageProblem(ctx);
 
 	let marker: TitleMarkerData | undefined;
 	for (const entry of ctx.sessionManager.getEntries()) {
@@ -121,17 +124,9 @@ export async function maybeGenerateTitle(pi: ExtensionAPI, ctx: ExtensionContext
 	const isFirst = !state.autoName;
 	if (!isFirst && turns - state.lastTitledAt < config.titleRefreshEveryTurns) return;
 
-	const model = resolveModel(ctx, config.titleModel);
-	if (!model) return;
-
-	const conversation = recentConversationText(entries, 12);
-	if (!conversation.trim()) return;
-
 	state.inFlight = true;
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 30_000);
 	try {
-		const raw = await runCompletion(ctx, model, SYSTEM_PROMPT, conversation, controller.signal);
+		const raw = await generateTitle(ctx, entries);
 		if (!raw) return;
 		const title = cleanTitle(raw);
 		if (!title) return;
@@ -144,8 +139,78 @@ export async function maybeGenerateTitle(pi: ExtensionAPI, ctx: ExtensionContext
 	} catch {
 		// Titling is best-effort; never disrupt the session on failure.
 	} finally {
-		clearTimeout(timeout);
 		state.inFlight = false;
+	}
+}
+
+/** Produce a title according to the configured strategy. */
+async function generateTitle(ctx: ExtensionContext, entries: SessionEntry[]): Promise<string | null> {
+	switch (config.titleStrategy) {
+		case "heuristic":
+			return heuristic(entries).title || null;
+		case "auto": {
+			const { title, confident } = heuristic(entries);
+			if (confident && title) return title;
+			return (await llmTitle(ctx, entries)) ?? (title || null);
+		}
+		default: // "llm": fall back to the heuristic when no model is available.
+			return (await llmTitle(ctx, entries)) ?? (heuristic(entries).title || null);
+	}
+}
+
+/** Run the deterministic titler with the configured caps, threshold and language. */
+function heuristic(entries: SessionEntry[]) {
+	return heuristicTitle(entries, {
+		maxLen: config.maxTitleLength,
+		confidenceThreshold: config.titleConfidenceThreshold,
+		language: language(),
+	});
+}
+
+/**
+ * Resolve `config.language` once per process. An unknown id is a configuration
+ * error: we surface it (see `reportLanguageProblem`) and use English meanwhile,
+ * rather than dropping titles silently.
+ */
+let cachedLanguage: CompiledLanguage | undefined;
+let languageError: string | undefined;
+
+function language(): CompiledLanguage {
+	if (cachedLanguage) return cachedLanguage;
+	try {
+		cachedLanguage = resolveLanguage(config.language);
+	} catch (error) {
+		languageError = error instanceof Error ? error.message : String(error);
+		cachedLanguage = resolveLanguage(undefined); // English
+	}
+	return cachedLanguage;
+}
+
+/**
+ * Show a misconfigured `language` once per session. Called from `session_start`,
+ * where `ctx.ui` is available in TUI and RPC modes.
+ */
+function reportLanguageProblem(ctx: ExtensionContext): void {
+	language(); // populates languageError on failure
+	if (!languageError || !ctx.hasUI) return;
+	ctx.ui.notify(`Wayfarer: ${languageError} — using English.`, "warning");
+	languageError = undefined; // report once
+}
+
+/** Generate a title with the model, or null if no model / no content / aborted. */
+async function llmTitle(ctx: ExtensionContext, entries: SessionEntry[]): Promise<string | null> {
+	const model = resolveModel(ctx, config.titleModel);
+	if (!model) return null;
+
+	const conversation = recentConversationText(entries, 12);
+	if (!conversation.trim()) return null;
+
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 30_000);
+	try {
+		return await runCompletion(ctx, model, SYSTEM_PROMPT, conversation, controller.signal);
+	} finally {
+		clearTimeout(timeout);
 	}
 }
 

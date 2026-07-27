@@ -8,6 +8,7 @@
  */
 
 import type { KeyId } from "@earendil-works/pi-tui";
+import { DEFAULT_LANGUAGE_ID, type LanguagePack } from "./lang/index.ts";
 
 export type Scope = "folder" | "all";
 
@@ -31,9 +32,34 @@ export interface WayfarerConfig {
 
 	// --- Auto titles ---------------------------------------------------------
 	/**
+	 * How titles are generated:
+	 * - "heuristic": deterministic, zero-cost (files touched + RAKE keyphrases).
+	 * - "llm": always use the model (`titleModel`, or the current model).
+	 * - "auto": heuristic first; fall back to the model only when the heuristic
+	 *   result is weak (single generic keyword and no file signal).
+	 */
+	titleStrategy: "heuristic" | "llm" | "auto";
+	/**
+	 * Language used by the deterministic titler, as a registered pack id (`"en"`)
+	 * or a `LanguagePack` object. Packs are plain word lists in `src/lang/`;
+	 * register your own with `registerLanguage()` (see README, "Adding a language").
+	 * An unknown id is reported once per session and titling falls back to English.
+	 */
+	language: string | LanguagePack;
+	/**
+	 * Confidence score at or above which the `auto` strategy trusts the heuristic
+	 * and skips the model call. Higher = more model calls, better titles.
+	 * Contributions: +1/+2 the phrase recurs across ≥3/≥6 distinct user messages,
+	 * +2 the phrase names one of the files you touched, +1 clear margin over the
+	 * runner-up phrase, -2 generic-action-only phrase, -2 very thin session.
+	 * Measured over a 43-session corpus: threshold 1 → ~35% of sessions call the
+	 * model, 2 → ~65%, 3 → ~91%. Run `npm run eval` against your own sessions.
+	 */
+	titleConfidenceThreshold: number;
+	/**
 	 * Model used to generate titles/summaries, as "provider/model-id"
 	 * (e.g. "anthropic/claude-haiku-4-5"). Leave undefined to reuse the
-	 * session's currently selected model.
+	 * session's currently selected model. Only used for the "llm"/"auto" strategies.
 	 */
 	titleModel: string | undefined;
 	/** Generate the first title once the branch has at least this many assistant turns. */
@@ -62,6 +88,9 @@ export const config: WayfarerConfig = {
 	staleDays: 7,
 	defaultScope: "folder",
 
+	titleStrategy: "heuristic",
+	language: DEFAULT_LANGUAGE_ID,
+	titleConfidenceThreshold: 2,
 	titleModel: undefined,
 	titleFirstAtTurn: 2,
 	titleRefreshEveryTurns: 3,
