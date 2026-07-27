@@ -25,27 +25,66 @@ Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
 `pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
 nothing to install.
 
-### From git (recommended)
+The latest release is **v0.2.1**. Releases are git tags; there is no npm
+package.
+
+### Install a specific version (recommended)
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.1.0
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.1
 ```
 
-Pin a released tag as above, or track `main` by omitting the ref. Use `-l` to
-install into project settings (`.pi/settings.json`) instead of your user
-settings. Update later with:
+The ref is **pinned**. `pi update --extensions` re-fetches that exact tag and
+resets the clone to it — it will never move you to a newer release. This is the
+reproducible choice, and the right one for project settings shared with a team.
+
+To change version later — upgrade *or* downgrade — re-run install with the new
+tag:
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.0   # move to a new tag
-pi update --extensions                                   # reconcile the pinned ref
-pi remove  git:github.com/A7exSchin/pi-wayfarer          # uninstall
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.2.0   # move to another tag
 ```
+
+### Always install the latest (track `main`)
+
+```bash
+pi install git:github.com/A7exSchin/pi-wayfarer
+```
+
+Omitting the ref clones the repository's default branch. Because no ref is
+pinned, `pi update --extensions` resolves the clone's upstream branch and resets
+to its newest commit — so you follow `main` continuously.
+
+This includes unreleased work. Use it if you want fixes immediately and can
+tolerate breakage; use a tag otherwise.
+
+### Updating
+
+| Command | Pinned to a tag | Tracking `main` |
+|---|---|---|
+| `pi update --extensions` | re-resets the clone to the **same** tag | fast-forwards to the newest `main` commit |
+| `pi update git:github.com/A7exSchin/pi-wayfarer` | same, for this package only | same, for this package only |
+| `pi update --all` | as above, **and** updates the pi CLI itself | as above, and updates pi |
+| `pi install …@v0.3.0` | moves the pin to that tag | replaces tracking with a pin |
+
+```bash
+pi list                                          # show installed packages
+pi remove git:github.com/A7exSchin/pi-wayfarer   # uninstall
+```
+
+All of these write to user settings (`~/.pi/agent/settings.json`) by default.
+Add `-l` to `install`/`remove` to use project settings (`.pi/settings.json`)
+instead; pi installs missing project packages automatically once the project is
+trusted.
 
 ### Try it without installing
 
 ```bash
-pi -e git:github.com/A7exSchin/pi-wayfarer
+pi -e git:github.com/A7exSchin/pi-wayfarer          # latest main, this run only
+pi -e git:github.com/A7exSchin/pi-wayfarer@v0.2.1   # a specific tag, this run only
 ```
+
+Installs to a temporary directory and is discarded when pi exits.
 
 ### From a local clone (development)
 
@@ -58,6 +97,19 @@ pi -e .
 ```
 
 After changes, run `/reload` inside pi to pick them up.
+
+### Releases
+
+| Tag | Contents |
+|---|---|
+| `v0.2.1` | Panel stale-row colour fix, larger overlay |
+| `v0.2.0` | Command-only panel with the `/wf` alias |
+| `v0.1.1` | Declared `@earendil-works/*` peer dependencies |
+| `v0.1.0` | Initial release |
+
+Tags are created by CI when `version` in `package.json` changes on `main`
+(`.github/workflows/release.yml`), and follow SemVer as derived from
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
 ## Usage
 
@@ -78,8 +130,11 @@ shortcut handlers cannot switch sessions, and `sendUserMessage` bypasses command
 handling. To open the panel with a keystroke, bind pi's built-in
 `app.session.resume` in `keybindings.json` for the native picker, or type `/wf`.
 
-Auto-titling happens in the background when pi finishes responding, throttled so
-it costs at most one small model call every few turns.
+Auto-titling happens in the background when pi finishes responding. By default
+it is **deterministic and free** — no model call — deriving a title from the
+files you touched and keyphrases from your prompts (RAKE). Set `titleStrategy`
+to `llm` for model-generated titles, or `auto` to use the heuristic and fall
+back to the model only when the heuristic signal is weak.
 
 ## Configuration
 
@@ -93,7 +148,10 @@ All knobs live in [`src/config.ts`](src/config.ts):
 | `scopeKey` | `t` | Toggle folder ↔ all (in panel) |
 | `staleDays` | `7` | Older-than-this (by `modified`) → stale badge |
 | `defaultScope` | `folder` | `folder` = current dir, `all` = every project |
-| `titleModel` | `undefined` | `"provider/model-id"`, or current model if unset |
+| `titleStrategy` | `heuristic` | `heuristic` (free) · `llm` · `auto` (heuristic, LLM fallback) |
+| `language` | `"en"` | Language pack id, or a `LanguagePack` object (see below) |
+| `titleConfidenceThreshold` | `2` | Score at which `auto` trusts the heuristic and skips the model |
+| `titleModel` | `undefined` | `"provider/model-id"`, or current model if unset (`llm`/`auto` only) |
 | `titleFirstAtTurn` | `2` | First title after N assistant turns |
 | `titleRefreshEveryTurns` | `3` | Re-title cadence afterwards |
 | `titleMaxChars` | `6000` | Conversation budget sent for titling |
@@ -105,14 +163,107 @@ After editing, run `/reload` in pi (or restart).
 
 ## How it works (notes)
 
-- Titles: `setSessionName()` on `agent_settled`, throttled by assistant-turn
-  count. A `custom` session entry records our last auto-title so a human-set
-  `/name` is detected and never clobbered, surviving reloads.
+- Titles: on `agent_settled`, throttled by assistant-turn count.
+  - `heuristic` (default): deterministic RAKE keyphrases from user prompts +
+    weighted file basenames from `write`/`edit`/`read` tool calls; no model call.
+    Candidate phrases are delimited by stopwords *and* punctuation/line breaks,
+    so a phrase never straddles a sentence or message boundary. Hex identifiers
+    (`66cd5b598c`) and `snake_case` names pasted from code or logs are dropped,
+    as is conversational filler ("sounds good", "perfect").
+  - Phrases are ranked by `rakeScore / len^0.5 * (1 + log2(recurrence))`, not by
+    the raw RAKE score. RAKE sums word scores, so long rare phrases win by
+    construction — on a 43-session corpus the raw top phrase was of maximal
+    length in 40 of 43. Length damping plus recurrence weighting raised
+    independent file-name corroboration from 9% to 14% of sessions and turned
+    titles like `6f1bd239 7a26 4b48 870f` into `Receiver Supports Hdcp 2.2`.
+  - `llm` / `auto`: model call via `setSessionName()`; `auto` only calls the
+    model when the heuristic result scores below `titleConfidenceThreshold`.
+  - Confidence is an additive score, and every contribution is reported in
+    `reasons` so the decision (which controls spend in `auto` mode) is auditable:
+
+    | Contribution | Δ |
+    |---|---|
+    | phrase recurs across ≥3 / ≥6 distinct user messages | +1 / +2 |
+    | phrase names one of the 3 most-touched files | +2 |
+    | top phrase outranks the runner-up by ≥1.5× | +1 |
+    | phrase consists only of generic action verbs | −2 |
+    | fewer than 12 content tokens in the whole session | −2 |
+
+    Phrase *length* is deliberately not rewarded: it fired on 40 of 43 real
+    sessions, making it a constant offset rather than evidence. The recurrence
+    bars are high because ranking already maximises recurrence.
+  - A `custom` session entry records our last auto-title so a human-set `/name`
+    is detected and never clobbered, surviving reloads.
 - Panel: `SessionManager.list(cwd)` / `listAll()` for the two scopes; staleness
   is derived from `SessionInfo.modified`. Selection returns to the command
   handler, which owns `switchSession`.
 - Summary: uses `SessionInfo.allMessagesText` (already collected for the
   picker), so it never re-opens the session file.
+
+## Adding a language
+
+The titler is language-neutral — the tokenizer handles any Unicode script — but
+the word lists are not. Everything language-specific lives in `src/lang/` as
+plain data:
+
+```typescript
+// src/lang/de.ts
+import type { LanguagePack } from "./types.ts";
+
+export const german: LanguagePack = {
+  id: "de",
+  name: "Deutsch",
+  stopwords: ["der", "die", "das", "und", "bitte", "jetzt", "passt", /* … */],
+  genericActions: ["mach", "machen", "ändere", "prüfe", "zeige", /* … */],
+  minorWords: ["der", "die", "das", "von", "zu", /* … */],
+};
+```
+
+Register it and select it:
+
+```typescript
+import { registerLanguage } from "./lang/index.ts";
+import { german } from "./lang/de.ts";
+
+registerLanguage(german);        // call once at load time
+config.language = "de";          // or: config.language = german
+```
+
+`config.language` accepts a registered id *or* a pack object directly, so a
+third party can supply a language without touching the registry. An unknown id
+is reported once per session via a TUI notification and titling falls back to
+English — it is never silently ignored.
+
+What each list does:
+
+| Field | Effect |
+|---|---|
+| `stopwords` | Delimit RAKE candidate phrases; a phrase never contains one. Include conversational filler ("ok", "sounds", "perfect") — phrases are ranked by recurrence, and filler recurs constantly |
+| `genericActions` | Verbs that describe an action but never a topic. Allowed in a title, but a phrase made only of them is penalised and they never count towards recurrence |
+| `minorWords` | Left lowercase by title casing unless they lead. Only has an effect for words that are *not* also stopwords (`via`, `per`, `vs`) |
+
+Check your pack against real sessions:
+
+```bash
+node test/evaluate-sessions.ts --language de
+```
+
+## Tests
+
+```bash
+npm test          # unit tests for the deterministic titler (Node's runner, no deps)
+npm run eval      # replay your own sessions through the titler, read-only
+```
+
+TypeScript is stripped at load, so there is no build step and no dev
+dependencies. `npm run eval` reads `~/.pi/agent/sessions/**/*.jsonl` and prints,
+per session, the title the heuristic would produce, its confidence score and
+reasons, plus the aggregate `auto` fallback rate — use it to pick
+`titleConfidenceThreshold` for your own usage instead of trusting the default.
+
+```
+node test/evaluate-sessions.ts --threshold 3 --dir /path/to/sessions --quiet
+```
 
 ## Type checking
 
