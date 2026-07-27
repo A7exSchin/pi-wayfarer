@@ -6,8 +6,10 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { copyToClipboard, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Key, type MarkdownTheme, Markdown, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { config } from "./config.ts";
+import { keyHit } from "./keys.ts";
 
 interface ViewTheme {
 	fg(color: string, text: string): string;
@@ -20,8 +22,12 @@ class MarkdownView {
 	private offset = 0;
 	private cache?: { width: number; lines: string[] };
 	private readonly md: Markdown;
+	/** Transient footer message, e.g. the result of a copy. Cleared on the next key. */
+	private notice?: string;
 
 	onClose?: () => void;
+	/** Fired on the copy key; the caller owns the clipboard and the re-render. */
+	onCopy?: () => void;
 
 	constructor(
 		private readonly theme: ViewTheme,
@@ -40,6 +46,9 @@ class MarkdownView {
 	}
 
 	handleInput(data: string): void {
+		const hadNotice = this.notice !== undefined;
+		this.notice = undefined;
+
 		if (matchesKey(data, Key.up)) {
 			if (this.offset > 0) this.offset--;
 		} else if (matchesKey(data, Key.down)) {
@@ -48,9 +57,17 @@ class MarkdownView {
 			this.offset = Math.max(0, this.offset - VIEWPORT);
 		} else if (matchesKey(data, Key.pageDown)) {
 			this.offset += VIEWPORT;
+		} else if (keyHit(data, config.copyKey)) {
+			this.onCopy?.();
 		} else if (matchesKey(data, Key.escape) || matchesKey(data, Key.enter) || data === "q") {
-			this.onClose?.();
+			// A notice is dismissed first, so the key that clears it does not also close.
+			if (!hadNotice) this.onClose?.();
 		}
+	}
+
+	/** Show a transient line in the footer (copy result, errors). */
+	setNotice(notice: string): void {
+		this.notice = notice;
 	}
 
 	private rule(width: number): string {
@@ -74,8 +91,10 @@ class MarkdownView {
 
 		lines.push(this.rule(width));
 		const scrollable = body.length > viewport;
-		const help = scrollable ? "↑↓ scroll · esc / q close" : "esc / q close";
-		lines.push(truncateToWidth(t.fg("dim", help), width));
+		const help =
+			this.notice ??
+			`${scrollable ? "↑↓ scroll · " : ""}${config.copyKey} copy · esc / q close`;
+		lines.push(truncateToWidth(t.fg(this.notice ? "accent" : "dim", help), width));
 		lines.push(this.rule(width));
 		return lines;
 	}
@@ -92,6 +111,16 @@ export async function showMarkdown(ctx: ExtensionContext, title: string, text: s
 		(tui, theme, _keybindings, done) => {
 			const view = new MarkdownView(theme as unknown as ViewTheme, getMarkdownTheme(), title, text);
 			view.onClose = () => done();
+			view.onCopy = () => {
+				// Copies the source markdown, not the rendered lines: what lands in the
+				// clipboard should be pasteable, not wrapped and ANSI-coloured.
+				copyToClipboard(text)
+					.then(() => view.setNotice(`Copied ${text.length} characters to the clipboard`))
+					.catch((error: unknown) => {
+						view.setNotice(`Copy failed: ${error instanceof Error ? error.message : String(error)}`);
+					})
+					.finally(() => tui.requestRender());
+			};
 			return {
 				render: (width) => view.render(width),
 				handleInput: (data) => {

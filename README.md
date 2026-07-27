@@ -138,6 +138,7 @@ Open the panel with the `/wayfarer` command (or its shorthand `/wf`):
 | Navigate | `↑` / `↓` |
 | Switch to selected session | `Enter` |
 | Summarize selected session | `s` |
+| Copy summary / plan to clipboard | `c` (in the overlay) |
 | Move selected session to the bin | `d` |
 | Toggle folder ↔ all sessions | `t` |
 | Close | `Esc` |
@@ -257,6 +258,7 @@ All knobs live in [`src/config.ts`](src/config.ts):
 | `summaryKey` | `s` | Summarize selected (in panel) |
 | `scopeKey` | `t` | Toggle folder ↔ all (in panel) |
 | `deleteKey` | `d` | Move selected session to the bin (in panel) |
+| `copyKey` | `c` | Copy the overlay's contents to the clipboard |
 | `staleDays` | `7` | Older-than-this (by `modified`) → stale badge |
 | `defaultScope` | `folder` | `folder` = current dir, `all` = every project |
 | `purgeDays` | `90` | `/wf purge` age threshold (not the badge threshold) |
@@ -318,6 +320,10 @@ After editing, run `/reload` in pi (or restart).
   entry outlives `purgeRetentionDays`.
 - Summary: uses `SessionInfo.allMessagesText` (already collected for the
   picker), so it never re-opens the session file.
+- Overlays: summaries, plans and errors all render through one scrollable
+  markdown view. `c` copies the **source** markdown via pi's `copyToClipboard`,
+  which falls back to OSC 52 over SSH — so what you paste is unwrapped and free
+  of ANSI codes.
 
 ## Adding a language
 

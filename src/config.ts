@@ -25,6 +25,8 @@ export interface WayfarerConfig {
 	scopeKey: KeyId;
 	/** Inside the panel: move the highlighted session to the Wayfarer bin. */
 	deleteKey: KeyId;
+	/** Inside a summary / plan overlay: copy its contents to the clipboard. */
+	copyKey: KeyId;
 
 	// --- Panel ---------------------------------------------------------------
 	/** Sessions whose `modified` is older than this many days get a stale badge. */
@@ -103,6 +105,7 @@ export const config: WayfarerConfig = {
 	summaryKey: "s",
 	scopeKey: "t",
 	deleteKey: "d",
+	copyKey: "c",
 
 	staleDays: 7,
 	defaultScope: "folder",

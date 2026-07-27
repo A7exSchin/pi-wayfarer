@@ -10,8 +10,9 @@
  */
 
 import type { ExtensionCommandContext, SessionInfo } from "@earendil-works/pi-coding-agent";
-import { Key, type KeyId, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { config, type Scope } from "./config.ts";
+import { keyHit } from "./keys.ts";
 import { listSessions } from "./sessions.ts";
 
 export type PanelResult =
@@ -33,10 +34,6 @@ interface PanelTheme {
 
 async function loadSessions(ctx: ExtensionCommandContext, scope: Scope): Promise<SessionInfo[]> {
 	return await listSessions(ctx, scope);
-}
-
-function keyHit(data: string, key: KeyId): boolean {
-	return key.length === 1 ? data === key : matchesKey(data, key);
 }
 
 // SGR color/style escape sequences.
