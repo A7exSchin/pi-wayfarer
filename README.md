@@ -28,13 +28,13 @@ Wayfarer imports pi's own runtime packages (`@earendil-works/pi-coding-agent`,
 `pi-tui`, `pi-ai`) as peer dependencies — the host provides them, so there is
 nothing to install.
 
-The latest release is **v0.5.0**. Releases are git tags; there is no npm
+The latest release is **v0.5.1**. Releases are git tags; there is no npm
 package.
 
 ### Install a specific version (recommended)
 
 ```bash
-pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.0
+pi install git:github.com/A7exSchin/pi-wayfarer@v0.5.1
 ```
 
 The ref is **pinned**. `pi update --extensions` re-fetches that exact tag and
@@ -84,7 +84,7 @@ trusted.
 
 ```bash
 pi -e git:github.com/A7exSchin/pi-wayfarer          # latest main, this run only
-pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.0   # a specific tag, this run only
+pi -e git:github.com/A7exSchin/pi-wayfarer@v0.5.1   # a specific tag, this run only
 ```
 
 Installs to a temporary directory and is discarded when pi exits.
@@ -101,10 +101,21 @@ pi -e .
 
 After changes, run `/reload` inside pi to pick them up.
 
+> While iterating, prefer the local install over a git pin: local paths are
+> referenced, not copied, so `/reload` sees every edit. Remove the git entry
+> first — package identity is the repo URL for git and the absolute path for
+> local, so both would load and register `/wayfarer` twice:
+>
+> ```bash
+> pi remove git:github.com/A7exSchin/pi-wayfarer
+> pi install ~/GitLib/pi-wayfarer
+> ```
+
 ### Releases
 
 | Tag | Contents |
 |---|---|
+| `v0.5.1` | Provider errors are reported instead of being shown as empty results |
 | `v0.5.0` | `/wf purge` + `/wf restore`, recoverable bin, `d` key in the panel |
 | `v0.4.0` | `/wf retitle` and `/wf retitle all`; session-directory fix |
 | `v0.3.0` | Deterministic titles with confidence scoring, language packs |
