@@ -20,6 +20,8 @@ import { parsePurgeArgs } from "./purge.ts";
 import { purgeOne, runPurge, runRestore } from "./purge-run.ts";
 import { parseRetitleArgs } from "./retitle.ts";
 import { runRetitle } from "./retitle-run.ts";
+import { applySettings, loadSettings } from "./settings.ts";
+import { showSettings } from "./settings-view.ts";
 import { showSummary } from "./summary.ts";
 import { maybeGenerateTitle, restoreTitleState } from "./titles.ts";
 
@@ -27,6 +29,11 @@ export default function (pi: ExtensionAPI) {
 	// --- Auto titles ---------------------------------------------------------
 	pi.on("session_start", async (_event, ctx) => {
 		restoreTitleState(pi, ctx);
+		// Apply persisted settings over the declared defaults, so a choice made in
+		// the settings overlay survives a reload without touching config.ts.
+		const { settings, problems } = loadSettings();
+		applySettings(config, settings);
+		for (const problem of problems) ctx.ui.notify(`Wayfarer settings: ${problem}`, "warning");
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
@@ -94,11 +101,13 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// result.type === "summarize" | "delete": act, then reopen where we left off.
+			// result.type === "summarize" | "delete" | "settings": act, then reopen where we left off.
 			index = result.index;
 			scope = result.scope;
 			if (result.type === "delete") {
 				await purgeOne(ctx, result.session);
+			} else if (result.type === "settings") {
+				await showSettings(ctx);
 			} else {
 				await showSummary(ctx, result.session);
 			}

@@ -19,6 +19,7 @@ export type PanelResult =
 	| { type: "switch"; session: SessionInfo }
 	| { type: "summarize"; session: SessionInfo; index: number; scope: Scope }
 	| { type: "delete"; session: SessionInfo; index: number; scope: Scope }
+	| { type: "settings"; index: number; scope: Scope }
 	| { type: "close" };
 
 interface OpenPanelOptions {
@@ -82,6 +83,7 @@ class SessionPanel {
 	onSwitch?: (session: SessionInfo) => void;
 	onSummarize?: (session: SessionInfo, index: number) => void;
 	onDelete?: (session: SessionInfo, index: number) => void;
+	onSettings?: () => void;
 	onToggleScope?: () => void;
 	onClose?: () => void;
 
@@ -134,6 +136,8 @@ class SessionPanel {
 		} else if (keyHit(data, config.deleteKey)) {
 			const s = this.sessions[this.selected];
 			if (s) this.onDelete?.(s, this.selected);
+		} else if (keyHit(data, config.settingsKey)) {
+			this.onSettings?.();
 		} else if (keyHit(data, config.scopeKey)) {
 			this.onToggleScope?.();
 		} else if (matchesKey(data, Key.escape)) {
@@ -176,7 +180,7 @@ class SessionPanel {
 
 		lines.push(this.rule(width));
 		const scopeHint = this.scope === "folder" ? "all" : "folder";
-		const help = `↑↓ move · ⏎ switch · ${config.summaryKey} summary · ${config.deleteKey} bin · ${config.scopeKey} ${scopeHint} · esc close`;
+		const help = `↑↓ move · ⏎ switch · ${config.summaryKey} summary · ${config.deleteKey} bin · ${config.settingsKey} settings · ${config.scopeKey} ${scopeHint} · esc close`;
 		lines.push(truncateToWidth(t.fg("dim", help), width));
 		lines.push(this.rule(width));
 		return lines;
@@ -238,6 +242,7 @@ export async function openPanel(ctx: ExtensionCommandContext, opts: OpenPanelOpt
 			panel.onSwitch = (session) => done({ type: "switch", session });
 			panel.onSummarize = (session, index) => done({ type: "summarize", session, index, scope });
 			panel.onDelete = (session, index) => done({ type: "delete", session, index, scope });
+			panel.onSettings = () => done({ type: "settings", index: panel.selected, scope });
 			panel.onClose = () => done({ type: "close" });
 			panel.onToggleScope = () => {
 				scope = scope === "folder" ? "all" : "folder";
