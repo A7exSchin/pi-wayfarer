@@ -10,9 +10,9 @@
  */
 
 import type { ExtensionCommandContext, SessionInfo } from "@earendil-works/pi-coding-agent";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { Key, type KeyId, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { config, type Scope } from "./config.ts";
+import { listSessions } from "./sessions.ts";
 
 export type PanelResult =
 	| { type: "switch"; session: SessionInfo }
@@ -31,8 +31,7 @@ interface PanelTheme {
 }
 
 async function loadSessions(ctx: ExtensionCommandContext, scope: Scope): Promise<SessionInfo[]> {
-	const list = scope === "folder" ? await SessionManager.list(ctx.cwd) : await SessionManager.listAll();
-	return [...list].sort((a, b) => b.modified.getTime() - a.modified.getTime());
+	return await listSessions(ctx, scope);
 }
 
 function keyHit(data: string, key: KeyId): boolean {
